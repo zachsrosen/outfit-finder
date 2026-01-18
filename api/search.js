@@ -63,7 +63,7 @@ export default async function handler(req, res) {
                                 price: item.extracted_price || item.price,
                                 originalPrice: item.old_price ? parseFloat(item.old_price.replace(/[^0-9.]/g, '')) : null,
                                 image: item.thumbnail,
-                                link: item.link,
+                                link: item.product_link || item.link || `https://www.google.com/search?q=${encodeURIComponent(item.title)}&tbm=shop`,
                                 source: source,
                                 rating: item.rating,
                                 reviews: item.reviews,
