@@ -1,0 +1,16 @@
+{
+  "name": "outfit-finder",
+  "version": "1.0.0",
+  "description": "AI-powered outfit finder with product recommendations and discount codes",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'Static site - no build needed'",
+    "start": "npx serve ."
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.52.0"
+  },
+  "devDependencies": {
+    "vercel": "^39.0.0"
+  }
+}

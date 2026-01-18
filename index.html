@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Outfit Finder</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <h1>Outfit Finder</h1>
+            <p class="tagline">Describe your dream outfit, we'll find it for you</p>
+        </header>
+
+        <main>
+            <section class="input-section">
+                <div class="input-wrapper">
+                    <textarea
+                        id="outfit-description"
+                        placeholder="Describe your perfect outfit... e.g., 'A cozy fall look with oversized sweater, high-waisted jeans, and ankle boots in earth tones'"
+                        rows="4"
+                    ></textarea>
+                    <button id="find-outfits" class="primary-btn">
+                        <span class="btn-text">Find My Outfit</span>
+                        <span class="btn-loader hidden">
+                            <span class="dot"></span>
+                            <span class="dot"></span>
+                            <span class="dot"></span>
+                        </span>
+                    </button>
+                </div>
+
+                <div class="quick-styles">
+                    <span class="label">Quick styles:</span>
+                    <button class="style-chip" data-style="casual weekend brunch outfit with jeans and a cute top">Casual Brunch</button>
+                    <button class="style-chip" data-style="elegant date night dress, black or burgundy, with heels">Date Night</button>
+                    <button class="style-chip" data-style="professional work outfit, blazer and trousers, modern and chic">Work Chic</button>
+                    <button class="style-chip" data-style="cozy athleisure set, matching loungewear, comfy but stylish">Athleisure</button>
+                    <button class="style-chip" data-style="summer vacation outfit, flowy dress or linen pants, beach vibes">Vacation</button>
+                </div>
+            </section>
+
+            <section id="results-section" class="results-section hidden">
+                <div class="results-header">
+                    <h2>Your Outfit Picks</h2>
+                    <p id="search-summary" class="search-summary"></p>
+                </div>
+
+                <div id="outfit-categories" class="outfit-categories">
+                    <!-- Categories will be inserted here -->
+                </div>
+            </section>
+
+            <section id="loading-section" class="loading-section hidden">
+                <div class="loading-content">
+                    <div class="loading-spinner"></div>
+                    <p>Finding the perfect pieces for you...</p>
+                </div>
+            </section>
+
+            <section id="error-section" class="error-section hidden">
+                <div class="error-content">
+                    <span class="error-icon">:(</span>
+                    <p id="error-message">Something went wrong. Please try again.</p>
+                    <button id="retry-btn" class="secondary-btn">Try Again</button>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Made with love</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
