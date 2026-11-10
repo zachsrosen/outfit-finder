@@ -1,83 +1,43 @@
-# Deploying Outfit Finder
+# Outfit Finder
 
-## Quick Deploy to Vercel (5 minutes)
+Type an outfit, get every piece broken out with places to order it, plus the
+extras that finish the look (shoes, bag, jewelry, layers).
 
-### Step 1: Get your API keys
+## How it works
 
-1. **Claude API Key** (required)
-   - Go to https://console.anthropic.com
-   - Sign up or log in
-   - Go to API Keys and create one
-   - Copy the key (starts with `sk-ant-`)
+1. `POST /api/analyze` turns the description into a list of pieces.
+   - With `ANTHROPIC_API_KEY`: Claude acts as the stylist (better names, smarter
+     search terms, thoughtful "complete the look" additions).
+   - Without it (or if the call fails): a built-in keyword breakdown is used.
+2. `POST /api/search` attaches, for every piece:
+   - search links straight into stores that fit the chosen budget
+     (`lib/stores.js`), always starting with Google Shopping;
+   - real product listings (photo, price, store) when `SERPAPI_KEY` is set.
 
-2. **SerpAPI Key** (optional but recommended for real products)
-   - Go to https://serpapi.com
-   - Sign up for free (100 searches/month free)
-   - Copy your API key from the dashboard
+The app works with zero keys. Each key makes it better.
 
-### Step 2: Deploy to Vercel
+| Env var | Needed? | What it adds |
+| --- | --- | --- |
+| `ANTHROPIC_API_KEY` | Recommended | AI stylist breakdown. Get one at https://console.anthropic.com |
+| `SERPAPI_KEY` | Optional | Real product cards from Google Shopping. https://serpapi.com |
 
-**Option A: Using the Vercel CLI (recommended)**
-
-```bash
-# Install Vercel CLI if you haven't
-npm install -g vercel
-
-# Navigate to the project folder
-cd /Users/zach/Downloads/outfit-finder
-
-# Deploy
-vercel
-
-# Follow the prompts:
-# - Link to existing project? No
-# - What's your project name? outfit-finder (or anything you like)
-# - Which directory? ./ (current directory)
-# - Override settings? No
-```
-
-After deploying, add your environment variables:
+## Run locally
 
 ```bash
-vercel env add ANTHROPIC_API_KEY
-# Paste your Claude API key when prompted
-
-vercel env add SERPAPI_KEY
-# Paste your SerpAPI key when prompted
-
-# Redeploy to pick up the new environment variables
-vercel --prod
+npm install
+npm run dev        # http://localhost:3000
+npm test
 ```
 
-**Option B: Using the Vercel Dashboard**
+## Deploy to Vercel
 
-1. Go to https://vercel.com and sign up/log in
-2. Click "Add New Project"
-3. Choose "Import Git Repository" or drag the `outfit-finder` folder
-4. Before deploying, add Environment Variables:
-   - `ANTHROPIC_API_KEY` = your Claude API key
-   - `SERPAPI_KEY` = your SerpAPI key
-5. Click Deploy
+1. Import this repo at https://vercel.com/new (no build settings needed).
+2. Project → Settings → Environment Variables: add the keys above.
+3. Redeploy, then send her the link. On iPhone: Share → Add to Home Screen.
 
-### Step 3: Share the link
+## Customizing
 
-Once deployed, you'll get a URL like:
-- `https://outfit-finder.vercel.app`
-- or `https://outfit-finder-yourusername.vercel.app`
-
-Send this link to your girlfriend - she can use it instantly on any device!
-
-## Customization Ideas
-
-- Change the app name in `index.html`
-- Modify the color scheme in `styles.css` (look for `--primary-color`)
-- Add more quick style chips in `index.html`
-- Add more coupon codes in `api/search.js`
-
-## Costs
-
-- **Vercel hosting**: Free (hobby tier)
-- **Claude API**: ~$0.01-0.03 per outfit search
-- **SerpAPI**: 100 free searches/month, then $50/month
-
-For personal use, you'll likely stay well within free tiers!
+- Stores and which budget tier they appear in: `lib/stores.js`
+- Stylist instructions: `SYSTEM` in `api/analyze.js`
+- Quick-idea chips: `index.html`
+- Colors: `:root` in `styles.css`
