@@ -1,167 +1,80 @@
-export default async function handler(req, res) {
-    // Enable CORS
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+import { BUDGETS, KINDS, KIND_ICONS, buildStoreLinks, googleShoppingUrl } from '../lib/stores.js';
 
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
+const MAX_PIECES = 10;
+const PRODUCTS_PER_PIECE = 4;
+
+const str = (value, max) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
+const isHttpUrl = value => typeof value === 'string' && /^https?:\/\//i.test(value);
+
+function parsePrice(value) {
+    if (typeof value === 'number') return value;
+    if (typeof value !== 'string') return null;
+    const n = parseFloat(value.replace(/[^0-9.]/g, ''));
+    return Number.isFinite(n) ? n : null;
+}
+
+// Real listings from Google Shopping via SerpAPI. Returns [] on any failure;
+// the store links still give her somewhere to shop.
+async function findProducts(query, apiKey) {
+    const url = `https://serpapi.com/search.json?engine=google_shopping&gl=us&hl=en&q=${encodeURIComponent(query)}&api_key=${apiKey}`;
+    try {
+        const response = await fetch(url, { signal: AbortSignal.timeout(12_000) });
+        if (!response.ok) {
+            console.warn(`SerpAPI ${response.status} for "${query}"`);
+            return [];
+        }
+        const data = await response.json();
+        return (data.shopping_results || [])
+            .filter(item => item.title)
+            .slice(0, PRODUCTS_PER_PIECE)
+            .map(item => {
+                const link = [item.product_link, item.link].find(isHttpUrl) || googleShoppingUrl(item.title);
+                return {
+                    title: item.title,
+                    price: parsePrice(item.extracted_price ?? item.price),
+                    originalPrice: parsePrice(item.extracted_old_price ?? item.old_price),
+                    image: isHttpUrl(item.thumbnail) ? item.thumbnail : null,
+                    link,
+                    source: item.source || 'Shop',
+                    rating: typeof item.rating === 'number' ? item.rating : null,
+                    reviews: typeof item.reviews === 'number' ? item.reviews : null
+                };
+            });
+    } catch (error) {
+        console.warn(`SerpAPI failed for "${query}":`, error.message);
+        return [];
     }
+}
 
+export default async function handler(req, res) {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    try {
-        const { categories } = req.body;
-
-        if (!categories || !Array.isArray(categories)) {
-            return res.status(400).json({ error: 'Categories array is required' });
-        }
-
-        const serpApiKey = process.env.SERPAPI_KEY;
-        const results = {};
-
-        // Common coupon codes by retailer
-        const couponDatabase = {
-            'ASOS': { code: 'EXTRA20', discount: '20% off' },
-            'H&M': { code: 'HMNEW15', discount: '15% off first order' },
-            'Nordstrom': { code: 'STYLE10', discount: '$10 off $50+' },
-            'Zara': { code: 'WELCOME10', discount: '10% off' },
-            'Madewell': { code: 'INSIDER25', discount: '25% off' },
-            'Anthropologie': { code: 'ANTHRO20', discount: '20% off full price' },
-            'Target': { code: 'CIRCLE10', discount: '10% with Target Circle' },
-            'Amazon': { code: 'FASHION15', discount: '15% select styles' },
-            'Amazon.com': { code: 'FASHION15', discount: '15% select styles' },
-            'Revolve': { code: 'NEWREVOLVE', discount: '10% first order' },
-            'Shopbop': { code: 'STYLE15', discount: '15% off' },
-            'Urban Outfitters': { code: 'UONEW10', discount: '10% off' },
-            'Free People': { code: 'FREESHIP', discount: 'Free shipping' },
-            'Gap': { code: 'GAPFRIEND', discount: '40% off' },
-            'Old Navy': { code: 'ONMORE', discount: '30% off' },
-            'Banana Republic': { code: 'BRCARD', discount: '20% off' },
-            'J.Crew': { code: 'SHOPNOW', discount: '25% off' },
-            'Everlane': { code: 'WELCOME10', discount: '10% first order' },
-            'Lululemon': { code: 'SWEAT15', discount: '15% off' },
-            'Nike': { code: 'SPORT20', discount: '20% off select' },
-            'Adidas': { code: 'ADIDAS15', discount: '15% off' }
-        };
-
-        for (const category of categories) {
-            try {
-                if (serpApiKey) {
-                    // Use real SerpAPI
-                    const searchUrl = `https://serpapi.com/search.json?engine=google_shopping&q=${encodeURIComponent(category.searchQuery)}&api_key=${serpApiKey}&num=6&gl=us`;
-                    const response = await fetch(searchUrl);
-
-                    if (response.ok) {
-                        const data = await response.json();
-                        const products = (data.shopping_results || []).slice(0, 4).map(item => {
-                            const source = item.source || 'Shop';
-                            return {
-                                title: item.title,
-                                price: item.extracted_price || item.price,
-                                originalPrice: item.old_price ? parseFloat(item.old_price.replace(/[^0-9.]/g, '')) : null,
-                                image: item.thumbnail,
-                                link: item.product_link || item.link || `https://www.google.com/search?q=${encodeURIComponent(item.title)}&tbm=shop`,
-                                source: source,
-                                rating: item.rating,
-                                reviews: item.reviews,
-                                coupon: couponDatabase[source] || null
-                            };
-                        });
-
-                        results[category.name] = {
-                            ...category,
-                            products
-                        };
-                        continue;
-                    }
-                }
-
-                // Fallback to mock data if no API key or request failed
-                results[category.name] = {
-                    ...category,
-                    products: await getMockProducts(category, couponDatabase)
-                };
-
-            } catch (error) {
-                console.warn(`Search failed for ${category.name}:`, error);
-                results[category.name] = {
-                    ...category,
-                    products: await getMockProducts(category, couponDatabase)
-                };
-            }
-        }
-
-        return res.status(200).json(results);
-
-    } catch (error) {
-        console.error('Search error:', error);
-        return res.status(500).json({
-            error: error.message || 'Failed to search products'
-        });
+    const input = req.body?.pieces;
+    if (!Array.isArray(input) || input.length === 0) {
+        return res.status(400).json({ error: 'No outfit pieces to search for.' });
     }
-}
+    const budget = BUDGETS.includes(req.body?.budget) ? req.body.budget : 'mid';
+    const serpApiKey = process.env.SERPAPI_KEY;
 
-async function getMockProducts(category, couponDatabase) {
-    const mockStores = ['Nordstrom', 'ASOS', 'Zara', 'H&M', 'Madewell', 'Anthropologie', 'Urban Outfitters', 'Free People'];
-    const products = [];
+    const pieces = input
+        .slice(0, MAX_PIECES)
+        .map(p => ({
+            name: str(p?.name, 80),
+            kind: KINDS.includes(p?.kind) ? p.kind : 'other',
+            searchQuery: str(p?.searchQuery, 150),
+            why: str(p?.why, 300),
+            requested: p?.requested !== false
+        }))
+        .filter(p => p.name && p.searchQuery);
 
-    // Use Unsplash for realistic fashion photos
-    const fashionKeywords = {
-        'Top': 'fashion-shirt',
-        'Tops': 'fashion-shirt',
-        'Blouse': 'blouse-fashion',
-        'Sweater': 'sweater-fashion',
-        'Jacket': 'jacket-fashion',
-        'Blazer': 'blazer-fashion',
-        'Bottom': 'jeans-fashion',
-        'Bottoms': 'jeans-fashion',
-        'Pants': 'pants-fashion',
-        'Jeans': 'jeans-fashion',
-        'Skirt': 'skirt-fashion',
-        'Trousers': 'trousers-fashion',
-        'Dress': 'dress-fashion',
-        'Shoes': 'shoes-fashion',
-        'Footwear': 'shoes-fashion',
-        'Heels': 'heels-fashion',
-        'Boots': 'boots-fashion',
-        'Sneakers': 'sneakers-fashion',
-        'Accessories': 'fashion-accessories',
-        'Bag': 'handbag-fashion',
-        'Jewelry': 'jewelry-fashion',
-        'Outerwear': 'coat-fashion',
-        'Coat': 'coat-fashion'
-    };
+    const results = await Promise.all(pieces.map(async piece => ({
+        ...piece,
+        icon: KIND_ICONS[piece.kind],
+        stores: buildStoreLinks(piece.searchQuery, piece.kind, budget),
+        products: serpApiKey ? await findProducts(piece.searchQuery, serpApiKey) : []
+    })));
 
-    // Find matching keyword or use generic fashion
-    let imageKeyword = 'fashion-clothing';
-    for (const [key, value] of Object.entries(fashionKeywords)) {
-        if (category.name.toLowerCase().includes(key.toLowerCase())) {
-            imageKeyword = value;
-            break;
-        }
-    }
-
-    for (let i = 0; i < 4; i++) {
-        const price = Math.floor(Math.random() * 100) + 30;
-        const hasDiscount = Math.random() > 0.5;
-        const source = mockStores[Math.floor(Math.random() * mockStores.length)];
-
-        // Use Unsplash Source for real fashion photos
-        const imageUrl = `https://source.unsplash.com/300x300/?${imageKeyword}&sig=${category.name}${i}`;
-
-        products.push({
-            title: `${category.searchQuery} - Style ${i + 1}`,
-            price: price,
-            originalPrice: hasDiscount ? Math.floor(price * 1.3) : null,
-            image: imageUrl,
-            link: `https://www.google.com/search?q=${encodeURIComponent(category.searchQuery)}&tbm=shop`,
-            source: source,
-            coupon: couponDatabase[source] || null
-        });
-    }
-
-    return products;
+    return res.status(200).json({ pieces: results, liveProducts: Boolean(serpApiKey) });
 }
